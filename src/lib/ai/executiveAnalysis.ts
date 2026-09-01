@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { anthropic, AI_MODEL } from "./client";
+import { getAnthropicClient, AI_MODEL } from "./client";
 import type { ExecutiveStats, TeacherSummary } from "../types";
 
 export const ExecutiveAnalysisSchema = z.object({
@@ -102,7 +102,7 @@ export async function analyzeExecutiveReport(
   stats: ExecutiveStats,
   summaries: TeacherSummary[],
 ): Promise<ExecutiveAnalysis> {
-  const response = await anthropic.messages.parse({
+  const response = await getAnthropicClient().messages.parse({
     model: AI_MODEL,
     max_tokens: 2048,
     output_config: {
