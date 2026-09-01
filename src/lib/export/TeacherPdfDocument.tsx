@@ -1,5 +1,6 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import type { CategoryStat, TeacherStats, TeacherSummary } from "../types";
+import { pdfSafe } from "./pdfText";
 
 const styles = StyleSheet.create({
   page: { padding: 40, fontSize: 10, fontFamily: "Helvetica", color: "#111" },
@@ -86,16 +87,16 @@ export function TeacherPdfDocument({
   return (
     <Document title={`${teacherName} - Feedback Report - ${termLabel}`}>
       <Page size="A4" style={styles.page} wrap>
-        <Text style={styles.title}>{teacherName}</Text>
+        <Text style={styles.title}>{pdfSafe(teacherName)}</Text>
         <Text style={styles.subtitle}>
-          {termLabel} · {stats.responseCount} responses across {stats.classCount} class
+          {pdfSafe(termLabel)} · {stats.responseCount} responses across {stats.classCount} class
           {stats.classCount === 1 ? "" : "es"} · overall avg {stats.overallAverage.toFixed(2)}/5
         </Text>
 
         <Text style={styles.sectionTitle}>Rating categories</Text>
         {stats.categories.map((c) => (
           <View key={c.question} style={styles.categoryRow}>
-            <Text style={styles.categoryLabel}>{c.question}</Text>
+            <Text style={styles.categoryLabel}>{pdfSafe(c.question)}</Text>
             <View style={styles.barTrack}>
               <View style={{ ...styles.barFill, width: `${(c.average / maxAvg) * 100}%` }} />
             </View>
@@ -108,7 +109,7 @@ export function TeacherPdfDocument({
         {summary && (
           <>
             <Text style={styles.sectionTitle}>Summary</Text>
-            <Text style={styles.narrative}>{summary.narrative}</Text>
+            <Text style={styles.narrative}>{pdfSafe(summary.narrative)}</Text>
 
             {summary.themes.length > 0 && (
               <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 8 }}>
@@ -119,7 +120,7 @@ export function TeacherPdfDocument({
                       key={i}
                       style={{ ...styles.themeChip, backgroundColor: c.bg, color: c.fg }}
                     >
-                      {t.theme} ×{t.mentions}
+                      {pdfSafe(t.theme)} x{t.mentions}
                     </Text>
                   );
                 })}
@@ -133,7 +134,7 @@ export function TeacherPdfDocument({
                 </Text>
                 {summary.flaggedConcerns.map((c, i) => (
                   <View key={i} style={styles.concernBox}>
-                    <Text style={styles.concernText}>{c}</Text>
+                    <Text style={styles.concernText}>{pdfSafe(c)}</Text>
                   </View>
                 ))}
               </View>
@@ -144,7 +145,7 @@ export function TeacherPdfDocument({
                 <Text style={styles.sectionTitle}>Professional development suggestions</Text>
                 {summary.pdActions.map((a, i) => (
                   <Text key={i} style={styles.pdItem}>
-                    {i + 1}. {a}
+                    {i + 1}. {pdfSafe(a)}
                   </Text>
                 ))}
               </View>
@@ -157,9 +158,9 @@ export function TeacherPdfDocument({
             <Text style={styles.sectionTitle}>Student comments</Text>
             {comments.map((c, i) => (
               <View key={i} style={styles.commentItem}>
-                <Text style={styles.commentText}>&ldquo;{c.text}&rdquo;</Text>
+                <Text style={styles.commentText}>&ldquo;{pdfSafe(c.text)}&rdquo;</Text>
                 <Text style={styles.commentMeta}>
-                  {c.question} · {c.className}
+                  {pdfSafe(c.question)} · {pdfSafe(c.className)}
                 </Text>
               </View>
             ))}

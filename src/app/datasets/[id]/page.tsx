@@ -37,12 +37,20 @@ export default async function DatasetPage({
             {dataset.teacherCount} teachers · uploaded {formatDate(dataset.uploadedAt)}
           </p>
         </div>
-        <a
-          href={`/api/datasets/${datasetId}/export/excel`}
-          className="shrink-0 rounded border border-black/15 px-3 py-1.5 text-xs font-medium hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
-        >
-          Export Excel workbook
-        </a>
+        <div className="flex shrink-0 gap-2">
+          <Link
+            href={`/datasets/${datasetId}/executive`}
+            className="rounded border border-black/15 px-3 py-1.5 text-xs font-medium hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
+          >
+            Executive report
+          </Link>
+          <a
+            href={`/api/datasets/${datasetId}/export/excel`}
+            className="rounded border border-black/15 px-3 py-1.5 text-xs font-medium hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
+          >
+            Export Excel workbook
+          </a>
+        </div>
       </div>
 
       <UnassignedPanel datasetId={datasetId} groups={unassignedGroups} />

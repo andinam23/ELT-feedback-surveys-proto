@@ -6,12 +6,15 @@ no multi-tenancy.
 
 ## Status
 
-**Stages 4-6 are built:** upload → parse → per-teacher grouping, AI-generated per-teacher
-summaries (themes, flagged concerns, PD suggestions) with editable PD actions, and
-per-teacher PDF + full Excel workbook export. **Stage 7 (executive report) is not yet built.**
+**All four stages (4-7) are built:** upload → parse → per-teacher grouping; AI-generated
+per-teacher summaries (themes, flagged concerns, PD suggestions) with editable PD actions;
+per-teacher PDF + full Excel workbook export; and an executive report (in-app dashboard +
+PDF) with department-wide trends, flagged teachers, and term-over-term comparison once a
+second term is uploaded.
 
-Requires `ANTHROPIC_API_KEY` in `.env.local` for the AI summary generation (Stages 5-6);
-Stage 4 upload/parsing/browsing works without it.
+Requires `ANTHROPIC_API_KEY` in `.env.local` for AI summary/executive-narrative generation;
+upload, parsing, browsing, and the computed (non-AI) parts of the executive report work
+without it.
 
 ## Setup
 
@@ -84,3 +87,14 @@ preserved until you explicitly regenerate.
 "Regenerate all" reprocesses everyone (and discards PD edits). Both run with limited
 concurrency (3 at a time) so a large dataset doesn't hammer the API — expect it to take a
 few minutes for 30+ teachers.
+
+## Executive report
+
+`/datasets/[id]/executive` computes department-wide stats live from the data (overall
+average, top/bottom rating categories, top/bottom teachers, and anyone flagged — either by
+an AI-flagged concern or a low overall average) and, separately, an optional AI-written
+narrative + key takeaways you generate on demand from those stats plus the aggregated
+themes across all per-teacher summaries. Term-over-term comparison appears automatically
+once a second dataset is uploaded, matched to the immediately preceding upload by upload
+time and compared question-by-question (only where the wording matches between terms).
+Exports as PDF from the same page.

@@ -81,3 +81,45 @@ export type TeacherSummary = {
   generatedAt: string;
   editedAt: string | null;
 };
+
+export type FlaggedTeacher = {
+  teacherName: string;
+  overallAverage: number;
+  reasons: string[]; // e.g. AI-flagged concern text, or "low average (2.8/5)"
+};
+
+export type TermComparisonRow = {
+  question: string;
+  current: number | null;
+  previous: number | null;
+  delta: number | null;
+};
+
+export type TermComparison = {
+  previousTermLabel: string;
+  previousDatasetId: number;
+  overallCurrent: number;
+  overallPrevious: number;
+  overallDelta: number;
+  categories: TermComparisonRow[];
+};
+
+export type ExecutiveStats = {
+  totalResponses: number;
+  totalTeachers: number;
+  overallAverage: number;
+  categories: CategoryStat[]; // dataset-wide, in source order
+  topCategories: CategoryStat[]; // best 3, by average
+  bottomCategories: CategoryStat[]; // worst 3, by average
+  topTeachers: TeacherStats[]; // best 5
+  bottomTeachers: TeacherStats[]; // worst 5 (min 2 responses, to avoid n=1 noise)
+  flaggedTeachers: FlaggedTeacher[];
+  termComparison: TermComparison | null;
+};
+
+export type ExecutiveReport = {
+  datasetId: number;
+  narrative: string;
+  keyTakeaways: string[];
+  generatedAt: string;
+};

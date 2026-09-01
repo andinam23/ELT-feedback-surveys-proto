@@ -71,3 +71,25 @@ export function computeAllTeacherStats(
   );
   return stats.sort((a, b) => a.teacherName.localeCompare(b.teacherName));
 }
+
+/**
+ * Dataset-wide category averages (all responses, including any still
+ * unassigned to a teacher — the ratings are still real signal about the
+ * classes even before that's resolved).
+ */
+export function computeDatasetCategoryStats(
+  responses: ResponseRecord[],
+  ratingQuestions: string[],
+): CategoryStat[] {
+  return ratingQuestions.map((question) => {
+    const values = responses
+      .map((r) => r.ratings[question])
+      .filter((v): v is number => typeof v === "number");
+    return {
+      question,
+      average: round2(mean(values)),
+      stdDev: round2(stdDev(values)),
+      count: values.length,
+    };
+  });
+}
