@@ -13,10 +13,11 @@ export async function GET(
   const datasetId = Number(id);
   const teacherName = decodeURIComponent(teacher);
 
-  const dataset = getDataset(datasetId);
+  const dataset = await getDataset(datasetId);
   if (!dataset) return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
 
-  const responses = getResponses(datasetId).filter(
+  const allResponses = await getResponses(datasetId);
+  const responses = allResponses.filter(
     (r) => !r.isUnassigned && r.teacherName === teacherName,
   );
   if (responses.length === 0) {
@@ -24,7 +25,7 @@ export async function GET(
   }
 
   const stats = computeTeacherStats(teacherName, responses, dataset.ratingQuestions);
-  const summary = getTeacherSummary(datasetId, teacherName);
+  const summary = await getTeacherSummary(datasetId, teacherName);
 
   const comments = dataset.commentQuestions.flatMap((question) =>
     responses

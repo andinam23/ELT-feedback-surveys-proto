@@ -28,61 +28,58 @@ function rowToSummary(row: SummaryRow): TeacherSummary {
   };
 }
 
-export function saveTeacherSummary(
+export async function saveTeacherSummary(
   datasetId: number,
   teacherName: string,
   analysis: TeacherAnalysis,
-): TeacherSummary {
+): Promise<TeacherSummary> {
   const now = new Date().toISOString();
-  db.prepare(
-    `INSERT INTO teacher_summaries
-       (dataset_id, teacher_name, narrative, themes, flagged_concerns, pd_actions, generated_at, edited_at)
-     VALUES (@datasetId, @teacherName, @narrative, @themes, @flaggedConcerns, @pdActions, @generatedAt, NULL)
-     ON CONFLICT(dataset_id, teacher_name) DO UPDATE SET
-       narrative = excluded.narrative,
-       themes = excluded.themes,
-       flagged_concerns = excluded.flagged_concerns,
-       pd_actions = excluded.pd_actions,
-       generated_at = excluded.generated_at,
-       edited_at = NULL`,
-  ).run({
-    datasetId,
-    teacherName,
-    narrative: analysis.narrative,
-    themes: JSON.stringify(analysis.themes),
-    flaggedConcerns: JSON.stringify(analysis.flaggedConcerns),
-    pdActions: JSON.stringify(analysis.pdActions),
-    generatedAt: now,
-  });
+  const themes = JSON.stringify(analysis.themes);
+  const flaggedConcerns = JSON.stringify(analysis.flaggedConcerns);
+  const pdActions = JSON.stringify(analysis.pdActions);
 
-  return getTeacherSummary(datasetId, teacherName)!;
+  const [row] = await db.sql<SummaryRow>`
+    INSERT INTO teacher_summaries
+      (dataset_id, teacher_name, narrative, themes, flagged_concerns, pd_actions, generated_at, edited_at)
+    VALUES (${datasetId}, ${teacherName}, ${analysis.narrative}, ${themes}, ${flaggedConcerns}, ${pdActions}, ${now}, NULL)
+    ON CONFLICT (dataset_id, teacher_name) DO UPDATE SET
+      narrative = EXCLUDED.narrative,
+      themes = EXCLUDED.themes,
+      flagged_concerns = EXCLUDED.flagged_concerns,
+      pd_actions = EXCLUDED.pd_actions,
+      generated_at = EXCLUDED.generated_at,
+      edited_at = NULL
+    RETURNING *
+  `;
+  return rowToSummary(row);
 }
 
-export function getTeacherSummary(datasetId: number, teacherName: string): TeacherSummary | null {
-  const row = db
-    .prepare(`SELECT * FROM teacher_summaries WHERE dataset_id = ? AND teacher_name = ?`)
-    .get(datasetId, teacherName) as SummaryRow | undefined;
+export async function getTeacherSummary(
+  datasetId: number,
+  teacherName: string,
+): Promise<TeacherSummary | null> {
+  const [row] = await db.sql<SummaryRow>`
+    SELECT * FROM teacher_summaries WHERE dataset_id = ${datasetId} AND teacher_name = ${teacherName}
+  `;
   return row ? rowToSummary(row) : null;
 }
 
-export function listSummaries(datasetId: number): TeacherSummary[] {
-  const rows = db
-    .prepare(`SELECT * FROM teacher_summaries WHERE dataset_id = ?`)
-    .all(datasetId) as SummaryRow[];
+export async function listSummaries(datasetId: number): Promise<TeacherSummary[]> {
+  const rows = await db.sql<SummaryRow>`
+    SELECT * FROM teacher_summaries WHERE dataset_id = ${datasetId}
+  `;
   return rows.map(rowToSummary);
 }
 
-export function updatePdActions(
+export async function updatePdActions(
   datasetId: number,
   teacherName: string,
   pdActions: string[],
-): TeacherSummary | null {
-  const info = db
-    .prepare(
-      `UPDATE teacher_summaries SET pd_actions = ?, edited_at = ?
-       WHERE dataset_id = ? AND teacher_name = ?`,
-    )
-    .run(JSON.stringify(pdActions), new Date().toISOString(), datasetId, teacherName);
-  if (info.changes === 0) return null;
-  return getTeacherSummary(datasetId, teacherName);
+): Promise<TeacherSummary | null> {
+  const [row] = await db.sql<SummaryRow>`
+    UPDATE teacher_summaries SET pd_actions = ${JSON.stringify(pdActions)}, edited_at = ${new Date().toISOString()}
+    WHERE dataset_id = ${datasetId} AND teacher_name = ${teacherName}
+    RETURNING *
+  `;
+  return row ? rowToSummary(row) : null;
 }

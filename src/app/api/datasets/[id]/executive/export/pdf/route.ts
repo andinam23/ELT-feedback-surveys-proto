@@ -11,11 +11,11 @@ export async function GET(
 ) {
   const { id } = await params;
   const datasetId = Number(id);
-  const dataset = getDataset(datasetId);
+  const dataset = await getDataset(datasetId);
   if (!dataset) return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
 
-  const stats = computeExecutiveStats(datasetId);
-  const report = getExecutiveReport(datasetId);
+  const stats = await computeExecutiveStats(datasetId);
+  const report = await getExecutiveReport(datasetId);
 
   const buffer = await renderToBuffer(
     ExecutivePdfDocument({ termLabel: dataset.termLabel, stats, report }),

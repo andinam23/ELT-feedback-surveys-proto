@@ -21,7 +21,7 @@ type ResponseRow = {
   row_index: number;
   teacher_raw: string;
   teacher_name: string | null;
-  is_unassigned: number;
+  is_unassigned: boolean;
   class_name: string;
   ratings: string;
   comments: string;
@@ -34,70 +34,73 @@ function rowToResponse(row: ResponseRow): ResponseRecord {
     rowIndex: row.row_index,
     teacherRaw: row.teacher_raw,
     teacherName: row.teacher_name,
-    isUnassigned: !!row.is_unassigned,
+    isUnassigned: row.is_unassigned,
     className: row.class_name,
     ratings: JSON.parse(row.ratings),
     comments: JSON.parse(row.comments),
   };
 }
 
-export function createDataset(
+export async function createDataset(
   termLabel: string,
   sourceFilename: string,
   parsed: ParsedDataset,
-): number {
-  const insertDataset = db.prepare(`
-    INSERT INTO datasets (term_label, source_filename, uploaded_at, rating_questions, comment_questions)
-    VALUES (?, ?, ?, ?, ?)
-  `);
-  const insertResponse = db.prepare(`
-    INSERT INTO responses (dataset_id, row_index, teacher_raw, teacher_name, is_unassigned, class_name, ratings, comments)
-    VALUES (@datasetId, @rowIndex, @teacherRaw, @teacherName, @isUnassigned, @className, @ratings, @comments)
-  `);
+): Promise<number> {
+  const client = await db.pool.connect();
+  try {
+    await client.query("BEGIN");
 
-  const txn = db.transaction(() => {
-    const info = insertDataset.run(
-      termLabel,
-      sourceFilename,
-      new Date().toISOString(),
-      JSON.stringify(parsed.ratingQuestions),
-      JSON.stringify(parsed.commentQuestions),
+    const datasetResult = await client.query<{ id: number }>(
+      `INSERT INTO datasets (term_label, source_filename, uploaded_at, rating_questions, comment_questions)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id`,
+      [
+        termLabel,
+        sourceFilename,
+        new Date().toISOString(),
+        JSON.stringify(parsed.ratingQuestions),
+        JSON.stringify(parsed.commentQuestions),
+      ],
     );
-    const datasetId = Number(info.lastInsertRowid);
+    const datasetId = datasetResult.rows[0].id;
 
     for (const r of parsed.responses) {
-      insertResponse.run({
-        datasetId,
-        rowIndex: r.rowIndex,
-        teacherRaw: r.teacherRaw,
-        teacherName: r.isUnassigned ? null : r.teacherName,
-        isUnassigned: r.isUnassigned ? 1 : 0,
-        className: r.className,
-        ratings: JSON.stringify(r.ratings),
-        comments: JSON.stringify(r.comments),
-      });
+      await client.query(
+        `INSERT INTO responses (dataset_id, row_index, teacher_raw, teacher_name, is_unassigned, class_name, ratings, comments)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          datasetId,
+          r.rowIndex,
+          r.teacherRaw,
+          r.isUnassigned ? null : r.teacherName,
+          r.isUnassigned,
+          r.className,
+          JSON.stringify(r.ratings),
+          JSON.stringify(r.comments),
+        ],
+      );
     }
 
+    await client.query("COMMIT");
     return datasetId;
-  });
-
-  return txn();
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
-function toSummary(row: DatasetRow): DatasetSummary {
-  const counts = db
-    .prepare(
-      `SELECT
-         COUNT(*) as responseCount,
-         COUNT(DISTINCT CASE WHEN is_unassigned = 0 THEN teacher_name END) as teacherCount,
-         SUM(is_unassigned) as unassignedCount
-       FROM responses WHERE dataset_id = ?`,
-    )
-    .get(row.id) as {
+async function toSummary(row: DatasetRow): Promise<DatasetSummary> {
+  const [counts] = await db.sql<{
     responseCount: number;
     teacherCount: number;
-    unassignedCount: number | null;
-  };
+    unassignedCount: number;
+  }>`SELECT
+       COUNT(*)::int as "responseCount",
+       COUNT(DISTINCT CASE WHEN is_unassigned = FALSE THEN teacher_name END)::int as "teacherCount",
+       COUNT(*) FILTER (WHERE is_unassigned)::int as "unassignedCount"
+     FROM responses WHERE dataset_id = ${row.id}`;
 
   return {
     id: row.id,
@@ -106,44 +109,39 @@ function toSummary(row: DatasetRow): DatasetSummary {
     uploadedAt: row.uploaded_at,
     responseCount: counts.responseCount,
     teacherCount: counts.teacherCount,
-    unassignedCount: counts.unassignedCount ?? 0,
+    unassignedCount: counts.unassignedCount,
   };
 }
 
-export function listDatasets(): DatasetSummary[] {
-  const rows = db
-    .prepare(`SELECT * FROM datasets ORDER BY uploaded_at DESC`)
-    .all() as DatasetRow[];
-  return rows.map(toSummary);
+export async function listDatasets(): Promise<DatasetSummary[]> {
+  const rows = await db.sql<DatasetRow>`SELECT * FROM datasets ORDER BY uploaded_at DESC`;
+  return Promise.all(rows.map(toSummary));
 }
 
-export function getDataset(id: number): DatasetRecord | null {
-  const row = db.prepare(`SELECT * FROM datasets WHERE id = ?`).get(id) as
-    | DatasetRow
-    | undefined;
+export async function getDataset(id: number): Promise<DatasetRecord | null> {
+  const [row] = await db.sql<DatasetRow>`SELECT * FROM datasets WHERE id = ${id}`;
   if (!row) return null;
   return {
-    ...toSummary(row),
+    ...(await toSummary(row)),
     ratingQuestions: JSON.parse(row.rating_questions),
     commentQuestions: JSON.parse(row.comment_questions),
   };
 }
 
-export function getResponses(datasetId: number): ResponseRecord[] {
-  const rows = db
-    .prepare(`SELECT * FROM responses WHERE dataset_id = ? ORDER BY row_index`)
-    .all(datasetId) as ResponseRow[];
+export async function getResponses(datasetId: number): Promise<ResponseRecord[]> {
+  const rows = await db.sql<ResponseRow>`
+    SELECT * FROM responses WHERE dataset_id = ${datasetId} ORDER BY row_index
+  `;
   return rows.map(rowToResponse);
 }
 
-export function getUnassignedGroups(
+export async function getUnassignedGroups(
   datasetId: number,
-): { className: string; teacherRaw: string; count: number; responseIds: number[] }[] {
-  const rows = db
-    .prepare(
-      `SELECT id, class_name, teacher_raw FROM responses WHERE dataset_id = ? AND is_unassigned = 1`,
-    )
-    .all(datasetId) as { id: number; class_name: string; teacher_raw: string }[];
+): Promise<{ className: string; teacherRaw: string; count: number; responseIds: number[] }[]> {
+  const rows = await db.sql<{ id: number; class_name: string; teacher_raw: string }>`
+    SELECT id, class_name, teacher_raw FROM responses
+    WHERE dataset_id = ${datasetId} AND is_unassigned = TRUE
+  `;
 
   const groups = new Map<
     string,
@@ -164,17 +162,17 @@ export function getUnassignedGroups(
   return Array.from(groups.values()).sort((a, b) => a.className.localeCompare(b.className));
 }
 
-export function assignTeacherToResponses(responseIds: number[], teacherName: string): void {
+export async function assignTeacherToResponses(
+  responseIds: number[],
+  teacherName: string,
+): Promise<void> {
   const trimmed = teacherName.trim();
-  const stmt = db.prepare(
-    `UPDATE responses SET teacher_name = ?, is_unassigned = 0 WHERE id = ?`,
-  );
-  const txn = db.transaction((ids: number[]) => {
-    for (const id of ids) stmt.run(trimmed, id);
-  });
-  txn(responseIds);
+  await db.sql`
+    UPDATE responses SET teacher_name = ${trimmed}, is_unassigned = FALSE
+    WHERE id = ANY(${responseIds})
+  `;
 }
 
-export function deleteDataset(id: number): void {
-  db.prepare(`DELETE FROM datasets WHERE id = ?`).run(id);
+export async function deleteDataset(id: number): Promise<void> {
+  await db.sql`DELETE FROM datasets WHERE id = ${id}`;
 }

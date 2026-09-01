@@ -10,22 +10,22 @@ import type { ExecutiveStats, FlaggedTeacher, TermComparison, TermComparisonRow 
 const LOW_AVERAGE_THRESHOLD = 3.5;
 const MIN_RESPONSES_FOR_RANKING = 2;
 
-function computeTermComparison(
+async function computeTermComparison(
   datasetId: number,
   currentOverall: number,
   currentCategories: { question: string; average: number }[],
-): TermComparison | null {
-  const allDatasets = listDatasets().sort(
+): Promise<TermComparison | null> {
+  const allDatasets = (await listDatasets()).sort(
     (a, b) => new Date(a.uploadedAt).getTime() - new Date(b.uploadedAt).getTime(),
   );
   const currentIndex = allDatasets.findIndex((d) => d.id === datasetId);
   if (currentIndex <= 0) return null; // no earlier dataset uploaded
 
   const previous = allDatasets[currentIndex - 1];
-  const previousDataset = getDataset(previous.id);
+  const previousDataset = await getDataset(previous.id);
   if (!previousDataset) return null;
 
-  const previousResponses = getResponses(previous.id);
+  const previousResponses = await getResponses(previous.id);
   const previousCategories = computeDatasetCategoryStats(
     previousResponses,
     previousDataset.ratingQuestions,
@@ -60,11 +60,11 @@ function computeTermComparison(
   };
 }
 
-export function computeExecutiveStats(datasetId: number): ExecutiveStats {
-  const dataset = getDataset(datasetId);
+export async function computeExecutiveStats(datasetId: number): Promise<ExecutiveStats> {
+  const dataset = await getDataset(datasetId);
   if (!dataset) throw new Error("Dataset not found");
 
-  const responses = getResponses(datasetId);
+  const responses = await getResponses(datasetId);
   const categories = computeDatasetCategoryStats(responses, dataset.ratingQuestions);
   const allValues = responses.flatMap((r) => Object.values(r.ratings));
   const overallAverage = round2(
@@ -81,7 +81,7 @@ export function computeExecutiveStats(datasetId: number): ExecutiveStats {
   const topTeachers = rankedByAverage.slice(0, 5);
   const bottomTeachers = rankedByAverage.slice(-5).reverse();
 
-  const summaries = listSummaries(datasetId);
+  const summaries = await listSummaries(datasetId);
   const summaryByTeacher = new Map(summaries.map((s) => [s.teacherName, s]));
 
   const flaggedTeachers: FlaggedTeacher[] = [];
@@ -100,7 +100,7 @@ export function computeExecutiveStats(datasetId: number): ExecutiveStats {
   }
   flaggedTeachers.sort((a, b) => a.overallAverage - b.overallAverage);
 
-  const termComparison = computeTermComparison(datasetId, overallAverage, categories);
+  const termComparison = await computeTermComparison(datasetId, overallAverage, categories);
 
   return {
     totalResponses: dataset.responseCount,

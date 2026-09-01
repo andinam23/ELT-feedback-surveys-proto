@@ -3,7 +3,7 @@ import { createDataset, listDatasets } from "@/lib/datasets";
 import { parseFeedbackFile } from "@/lib/parseFeedback";
 
 export async function GET() {
-  return NextResponse.json({ datasets: listDatasets() });
+  return NextResponse.json({ datasets: await listDatasets() });
 }
 
 export async function POST(req: NextRequest) {
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const datasetId = createDataset(termLabel, file.name, parsed);
+  const datasetId = await createDataset(termLabel, file.name, parsed);
 
   return NextResponse.json({
     datasetId,

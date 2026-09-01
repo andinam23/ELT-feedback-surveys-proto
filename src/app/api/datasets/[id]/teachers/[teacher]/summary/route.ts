@@ -8,7 +8,7 @@ type Params = { params: Promise<{ id: string; teacher: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
   const { id, teacher } = await params;
-  const summary = getTeacherSummary(Number(id), decodeURIComponent(teacher));
+  const summary = await getTeacherSummary(Number(id), decodeURIComponent(teacher));
   return NextResponse.json({ summary });
 }
 
@@ -17,10 +17,11 @@ export async function POST(_req: NextRequest, { params }: Params) {
   const datasetId = Number(id);
   const teacherName = decodeURIComponent(teacher);
 
-  const dataset = getDataset(datasetId);
+  const dataset = await getDataset(datasetId);
   if (!dataset) return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
 
-  const responses = getResponses(datasetId).filter(
+  const allResponses = await getResponses(datasetId);
+  const responses = allResponses.filter(
     (r) => !r.isUnassigned && r.teacherName === teacherName,
   );
   if (responses.length === 0) {
@@ -31,7 +32,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
   try {
     const analysis = await analyzeTeacherFeedback(teacherName, stats.categories, responses);
-    const summary = saveTeacherSummary(datasetId, teacherName, analysis);
+    const summary = await saveTeacherSummary(datasetId, teacherName, analysis);
     return NextResponse.json({ summary });
   } catch (err) {
     const message = err instanceof Error ? err.message : "AI analysis failed.";
@@ -45,7 +46,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!Array.isArray(body.pdActions)) {
     return NextResponse.json({ error: "pdActions array required" }, { status: 400 });
   }
-  const summary = updatePdActions(
+  const summary = await updatePdActions(
     Number(id),
     decodeURIComponent(teacher),
     body.pdActions.map((s) => s.trim()).filter(Boolean),

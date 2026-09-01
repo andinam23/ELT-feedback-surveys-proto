@@ -6,7 +6,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  return NextResponse.json({ groups: getUnassignedGroups(Number(id)) });
+  return NextResponse.json({ groups: await getUnassignedGroups(Number(id)) });
 }
 
 export async function POST(req: NextRequest) {
@@ -17,6 +17,6 @@ export async function POST(req: NextRequest) {
   if (!body.teacherName || !body.teacherName.trim()) {
     return NextResponse.json({ error: "teacherName required" }, { status: 400 });
   }
-  assignTeacherToResponses(body.responseIds, body.teacherName);
+  await assignTeacherToResponses(body.responseIds, body.teacherName);
   return NextResponse.json({ ok: true });
 }

@@ -12,11 +12,11 @@ export default async function ExecutivePage({
 }) {
   const { id } = await params;
   const datasetId = Number(id);
-  const dataset = getDataset(datasetId);
+  const dataset = await getDataset(datasetId);
   if (!dataset) notFound();
 
-  const stats = computeExecutiveStats(datasetId);
-  const report = getExecutiveReport(datasetId);
+  const stats = await computeExecutiveStats(datasetId);
+  const report = await getExecutiveReport(datasetId);
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-10 space-y-8">

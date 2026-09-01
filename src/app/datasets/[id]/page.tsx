@@ -14,13 +14,13 @@ export default async function DatasetPage({
 }) {
   const { id } = await params;
   const datasetId = Number(id);
-  const dataset = getDataset(datasetId);
+  const dataset = await getDataset(datasetId);
   if (!dataset) notFound();
 
-  const responses = getResponses(datasetId);
+  const responses = await getResponses(datasetId);
   const teacherStats = computeAllTeacherStats(responses, dataset.ratingQuestions);
-  const unassignedGroups = getUnassignedGroups(datasetId);
-  const summaries = listSummaries(datasetId);
+  const unassignedGroups = await getUnassignedGroups(datasetId);
+  const summaries = await listSummaries(datasetId);
   const summarizedNames = new Set(summaries.map((s) => s.teacherName));
   const pendingCount = teacherStats.filter((t) => !summarizedNames.has(t.teacherName)).length;
 

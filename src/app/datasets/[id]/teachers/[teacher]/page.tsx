@@ -14,10 +14,10 @@ export default async function TeacherPage({
   const datasetId = Number(id);
   const teacherName = decodeURIComponent(teacher);
 
-  const dataset = getDataset(datasetId);
+  const dataset = await getDataset(datasetId);
   if (!dataset) notFound();
 
-  const allResponses = getResponses(datasetId);
+  const allResponses = await getResponses(datasetId);
   const responses = allResponses.filter(
     (r) => !r.isUnassigned && r.teacherName === teacherName,
   );
@@ -25,7 +25,7 @@ export default async function TeacherPage({
 
   const stats = computeTeacherStats(teacherName, responses, dataset.ratingQuestions);
   const maxAvg = Math.max(...stats.categories.map((c) => c.average), 1);
-  const summary = getTeacherSummary(datasetId, teacherName);
+  const summary = await getTeacherSummary(datasetId, teacherName);
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-10 space-y-8">

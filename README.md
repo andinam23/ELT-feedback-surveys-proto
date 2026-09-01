@@ -1,8 +1,8 @@
 # ELT Feedback Tool (prototype)
 
 Turns a term's raw student feedback spreadsheet into per-teacher summaries, AI-drafted
-PD suggestions, and an executive report — a single-user local prototype, no accounts,
-no multi-tenancy.
+PD suggestions, and an executive report — a single-user prototype, no accounts, no
+multi-tenancy. Deployed on Netlify with Netlify DB (Postgres, auto-provisioned).
 
 ## Status
 
@@ -18,15 +18,22 @@ without it.
 
 ## Setup
 
+**Deployed:** this app is hosted on Netlify, with a Netlify DB (Postgres) instance
+auto-provisioned for it — no manual database setup. Set `ANTHROPIC_API_KEY` as a site
+environment variable in the Netlify dashboard for AI features to work.
+
+**Local dev (optional):** requires a Postgres instance and `DATABASE_URL` pointed at it
+(the app falls back to Netlify's own auto-injected connection when running via
+`netlify dev`, or to `DATABASE_URL` otherwise):
+
 ```bash
 npm install
-npm run dev
+DATABASE_URL="postgres://user:pass@localhost:5432/dbname" npm run dev
 ```
 
-Then open http://localhost:3000.
-
-Data is stored locally in `data/app.db` (SQLite, gitignored) — it survives restarts but
-never leaves your machine.
+Then open http://localhost:3000. The tables are created by
+`netlify/database/migrations/001_init/migration.sql` — run it against your local Postgres
+once before first use (`psql $DATABASE_URL -f netlify/database/migrations/001_init/migration.sql`).
 
 ## Uploading a feedback file
 
@@ -54,7 +61,7 @@ resolve them from the dataset page by typing in the correct teacher per affected
 ## Tech stack
 
 - Next.js (App Router) + TypeScript + Tailwind
-- SQLite via `better-sqlite3` for local persistence
+- Postgres via `@netlify/database` (auto-provisioned on deploy, no manual DB setup)
 - `exceljs` / `papaparse` for spreadsheet parsing, and `exceljs` again for the Excel export
 - `@anthropic-ai/sdk` (model `claude-opus-5` by default — override with `ANTHROPIC_MODEL`,
   e.g. `claude-sonnet-5`, if you want to trade quality for cost on a large dataset) for the
@@ -65,7 +72,8 @@ resolve them from the dataset page by typing in the correct teacher per affected
 
 ```
 src/lib/parseFeedback.ts        spreadsheet -> normalized responses (generic column inference)
-src/lib/db.ts                   SQLite schema + connection
+src/lib/db.ts                   Netlify DB connection (lazy-initialized)
+netlify/database/migrations/    Postgres schema, applied automatically on deploy
 src/lib/datasets.ts             dataset/response persistence
 src/lib/analysis.ts             per-teacher averages + spread (std dev)
 src/lib/summaries.ts            AI summary persistence (themes, concerns, PD actions)

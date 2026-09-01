@@ -4,8 +4,12 @@ import { formatDate } from "@/lib/util";
 import UploadForm from "./UploadForm";
 import DeleteDatasetButton from "./DeleteDatasetButton";
 
-export default function Home() {
-  const datasets = listDatasets();
+// Reads live data on every request - must not be statically prerendered at
+// build time (when no database connection is available yet).
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const datasets = await listDatasets();
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-10 space-y-10">

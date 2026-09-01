@@ -14,19 +14,22 @@ function rowToReport(row: Row): ExecutiveReport {
   };
 }
 
-export function saveExecutiveReport(datasetId: number, analysis: ExecutiveAnalysis): ExecutiveReport {
+export async function saveExecutiveReport(
+  datasetId: number,
+  analysis: ExecutiveAnalysis,
+): Promise<ExecutiveReport> {
   const now = new Date().toISOString();
-  db.prepare(
-    `INSERT INTO executive_reports (dataset_id, content, generated_at)
-     VALUES (?, ?, ?)
-     ON CONFLICT(dataset_id) DO UPDATE SET content = excluded.content, generated_at = excluded.generated_at`,
-  ).run(datasetId, JSON.stringify(analysis), now);
-  return getExecutiveReport(datasetId)!;
+  const content = JSON.stringify(analysis);
+  const [row] = await db.sql<Row>`
+    INSERT INTO executive_reports (dataset_id, content, generated_at)
+    VALUES (${datasetId}, ${content}, ${now})
+    ON CONFLICT (dataset_id) DO UPDATE SET content = EXCLUDED.content, generated_at = EXCLUDED.generated_at
+    RETURNING *
+  `;
+  return rowToReport(row);
 }
 
-export function getExecutiveReport(datasetId: number): ExecutiveReport | null {
-  const row = db
-    .prepare(`SELECT * FROM executive_reports WHERE dataset_id = ?`)
-    .get(datasetId) as Row | undefined;
+export async function getExecutiveReport(datasetId: number): Promise<ExecutiveReport | null> {
+  const [row] = await db.sql<Row>`SELECT * FROM executive_reports WHERE dataset_id = ${datasetId}`;
   return row ? rowToReport(row) : null;
 }

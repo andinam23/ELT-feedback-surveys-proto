@@ -16,25 +16,27 @@ export async function POST(
   const datasetId = Number(id);
   const { force = false } = (await req.json().catch(() => ({}))) as { force?: boolean };
 
-  const dataset = getDataset(datasetId);
+  const dataset = await getDataset(datasetId);
   if (!dataset) return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
 
-  const responses = getResponses(datasetId);
+  const responses = await getResponses(datasetId);
   const grouped = groupByTeacher(responses);
   const allStats = computeAllTeacherStats(responses, dataset.ratingQuestions);
   const statsByTeacher = new Map(allStats.map((s) => [s.teacherName, s]));
 
-  const teacherNames = Array.from(grouped.keys()).filter((name) => {
-    if (force) return true;
-    return !getTeacherSummary(datasetId, name);
-  });
+  const allNames = Array.from(grouped.keys());
+  let teacherNames = allNames;
+  if (!force) {
+    const existing = await Promise.all(allNames.map((name) => getTeacherSummary(datasetId, name)));
+    teacherNames = allNames.filter((_, i) => !existing[i]);
+  }
 
   const results = await mapWithConcurrency(teacherNames, CONCURRENCY, async (teacherName) => {
     const stats = statsByTeacher.get(teacherName)!;
     const teacherResponses = grouped.get(teacherName)!;
     try {
       const analysis = await analyzeTeacherFeedback(teacherName, stats.categories, teacherResponses);
-      saveTeacherSummary(datasetId, teacherName, analysis);
+      await saveTeacherSummary(datasetId, teacherName, analysis);
       return { teacherName, ok: true as const };
     } catch (err) {
       return {
