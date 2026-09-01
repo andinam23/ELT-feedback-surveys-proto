@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { computeTeacherStats } from "@/lib/analysis";
 import { getDataset, getResponses } from "@/lib/datasets";
+import { getTeacherSummary } from "@/lib/summaries";
+import TeacherSummaryPanel from "./TeacherSummaryPanel";
 
 export default async function TeacherPage({
   params,
@@ -23,27 +25,38 @@ export default async function TeacherPage({
 
   const stats = computeTeacherStats(teacherName, responses, dataset.ratingQuestions);
   const maxAvg = Math.max(...stats.categories.map((c) => c.average), 1);
+  const summary = getTeacherSummary(datasetId, teacherName);
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-10 space-y-8">
-      <div>
-        <Link
-          href={`/datasets/${datasetId}`}
-          className="text-xs text-black/50 hover:underline dark:text-white/50"
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <Link
+            href={`/datasets/${datasetId}`}
+            className="text-xs text-black/50 hover:underline dark:text-white/50"
+          >
+            ← {dataset.termLabel}
+          </Link>
+          <h1 className="text-2xl font-semibold mt-1">{teacherName}</h1>
+          <p className="text-sm text-black/60 dark:text-white/60">
+            {stats.responseCount} responses across {stats.classCount} class
+            {stats.classCount === 1 ? "" : "es"} · overall avg{" "}
+            <span className="font-medium">{stats.overallAverage.toFixed(2)}</span> · spread{" "}
+            {stats.overallStdDev.toFixed(2)}
+          </p>
+          <p className="text-xs text-black/40 dark:text-white/40 mt-1">
+            {stats.classes.join(" · ")}
+          </p>
+        </div>
+        <a
+          href={`/api/datasets/${datasetId}/teachers/${encodeURIComponent(teacherName)}/export/pdf`}
+          className="shrink-0 rounded border border-black/15 px-3 py-1.5 text-xs font-medium hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
         >
-          ← {dataset.termLabel}
-        </Link>
-        <h1 className="text-2xl font-semibold mt-1">{teacherName}</h1>
-        <p className="text-sm text-black/60 dark:text-white/60">
-          {stats.responseCount} responses across {stats.classCount} class
-          {stats.classCount === 1 ? "" : "es"} · overall avg{" "}
-          <span className="font-medium">{stats.overallAverage.toFixed(2)}</span> · spread{" "}
-          {stats.overallStdDev.toFixed(2)}
-        </p>
-        <p className="text-xs text-black/40 dark:text-white/40 mt-1">
-          {stats.classes.join(" · ")}
-        </p>
+          Export PDF
+        </a>
       </div>
+
+      <TeacherSummaryPanel datasetId={datasetId} teacherName={teacherName} initialSummary={summary} />
 
       <section>
         <h2 className="text-sm font-medium uppercase tracking-wide text-black/50 dark:text-white/50 mb-3">

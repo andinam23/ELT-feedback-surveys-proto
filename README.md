@@ -6,8 +6,12 @@ no multi-tenancy.
 
 ## Status
 
-**Stage 4 (upload → parse → per-teacher grouping) is built.** Stages 5-7 (AI summaries,
-PD plans, executive report, PDF/Excel export) are not yet built.
+**Stages 4-6 are built:** upload → parse → per-teacher grouping, AI-generated per-teacher
+summaries (themes, flagged concerns, PD suggestions) with editable PD actions, and
+per-teacher PDF + full Excel workbook export. **Stage 7 (executive report) is not yet built.**
+
+Requires `ANTHROPIC_API_KEY` in `.env.local` for the AI summary generation (Stages 5-6);
+Stage 4 upload/parsing/browsing works without it.
 
 ## Setup
 
@@ -48,16 +52,35 @@ resolve them from the dataset page by typing in the correct teacher per affected
 
 - Next.js (App Router) + TypeScript + Tailwind
 - SQLite via `better-sqlite3` for local persistence
-- `exceljs` / `papaparse` for spreadsheet parsing
-- Anthropic API (`@anthropic-ai/sdk`, added but not yet wired up) for the Stage 5-6 AI
-  calls — set `ANTHROPIC_API_KEY` in `.env.local` when that lands
+- `exceljs` / `papaparse` for spreadsheet parsing, and `exceljs` again for the Excel export
+- `@anthropic-ai/sdk` (model `claude-opus-5` by default — override with `ANTHROPIC_MODEL`,
+  e.g. `claude-sonnet-5`, if you want to trade quality for cost on a large dataset) for the
+  per-teacher theme/PD analysis, using structured outputs (`messages.parse` + a Zod schema)
+- `@react-pdf/renderer` for the per-teacher PDF export
 
 ## Project layout
 
 ```
-src/lib/parseFeedback.ts   spreadsheet -> normalized responses (generic column inference)
-src/lib/db.ts              SQLite schema + connection
-src/lib/datasets.ts        dataset/response persistence
-src/lib/analysis.ts        per-teacher averages + spread (std dev)
-src/app/                   pages + API routes
+src/lib/parseFeedback.ts        spreadsheet -> normalized responses (generic column inference)
+src/lib/db.ts                   SQLite schema + connection
+src/lib/datasets.ts             dataset/response persistence
+src/lib/analysis.ts             per-teacher averages + spread (std dev)
+src/lib/summaries.ts            AI summary persistence (themes, concerns, PD actions)
+src/lib/ai/teacherAnalysis.ts   Claude API call + schema for the per-teacher analysis
+src/lib/export/excel.ts         dataset -> Excel workbook (one tab per teacher)
+src/lib/export/TeacherPdfDocument.tsx  per-teacher PDF layout
+src/app/                        pages + API routes
 ```
+
+## AI summaries
+
+Each teacher's per-response ratings and every free-text comment are sent to Claude in one
+call, which returns (as structured JSON, not free text): a 2-3 sentence narrative, clustered
+themes with sentiment, any genuinely urgent/negative flagged concerns, and 2-3 evidence-
+grounded PD suggestions. PD suggestions are editable in the app before export — edits are
+preserved until you explicitly regenerate.
+
+"Generate AI summaries" on a dataset page only processes teachers without one yet;
+"Regenerate all" reprocesses everyone (and discards PD edits). Both run with limited
+concurrency (3 at a time) so a large dataset doesn't hammer the API — expect it to take a
+few minutes for 30+ teachers.

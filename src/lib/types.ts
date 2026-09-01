@@ -63,3 +63,21 @@ export type TeacherStats = {
   overallStdDev: number;
   categories: CategoryStat[];
 };
+
+export type Theme = {
+  theme: string;
+  sentiment: "positive" | "negative" | "mixed";
+  mentions: number;
+};
+
+export type TeacherSummary = {
+  id: number;
+  datasetId: number;
+  teacherName: string;
+  narrative: string;
+  themes: Theme[];
+  flaggedConcerns: string[];
+  pdActions: string[];
+  generatedAt: string;
+  editedAt: string | null;
+};
